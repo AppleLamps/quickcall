@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { PhoneOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { PhoneOff, Mic, MicOff, Volume2, VolumeX, Square } from 'lucide-react';
 
 interface AIState {
   isAISpeaking: boolean;
   isListening: boolean;
+  isUserSpeaking: boolean;
   error: string | null;
+  conversationState: 'idle' | 'user_speaking' | 'processing' | 'ai_speaking';
 }
 
 interface CallInterfaceProps {
@@ -15,9 +17,18 @@ interface CallInterfaceProps {
   callDuration: number;
   isConnected: boolean;
   aiState?: AIState;
+  onManualTurnComplete?: () => void;
+  getVolumeLevel?: () => number;
 }
 
-const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallInterfaceProps) => {
+const CallInterface = ({ 
+  onEndCall, 
+  callDuration, 
+  isConnected, 
+  aiState, 
+  onManualTurnComplete,
+  getVolumeLevel 
+}: CallInterfaceProps) => {
   const [isMuted, setIsMuted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
 
@@ -31,13 +42,19 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
     setIsMuted(!isMuted);
   };
 
-  // Simulate audio level animation when AI is speaking
+  // Update audio level visualization
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (aiState?.isAISpeaking) {
+      // AI speaking - show animated bars
       interval = setInterval(() => {
         setAudioLevel(Math.random() * 100);
+      }, 100);
+    } else if (aiState?.isUserSpeaking && getVolumeLevel) {
+      // User speaking - show real volume level
+      interval = setInterval(() => {
+        setAudioLevel(getVolumeLevel() * 100);
       }, 100);
     } else {
       setAudioLevel(0);
@@ -46,7 +63,7 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [aiState?.isAISpeaking]);
+  }, [aiState?.isAISpeaking, aiState?.isUserSpeaking, getVolumeLevel]);
 
   const getConnectionStatus = () => {
     if (!isConnected) return 'Connecting...';
@@ -55,17 +72,37 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
       if (aiState.error.includes('Connection failed')) return 'Connection Failed';
       return 'Connection Error';
     }
-    if (aiState?.isAISpeaking) return 'Emergency Contact Speaking';
-    if (aiState?.isListening) return 'Listening...';
-    return 'Connected - Speak now';
+    
+    switch (aiState?.conversationState) {
+      case 'user_speaking':
+        return 'You are speaking...';
+      case 'processing':
+        return 'Processing...';
+      case 'ai_speaking':
+        return 'Emergency Contact Speaking';
+      case 'idle':
+        return aiState?.isListening ? 'Listening - Speak now' : 'Ready';
+      default:
+        return 'Connected';
+    }
   };
 
   const getStatusColor = () => {
     if (!isConnected) return 'bg-muted text-muted-foreground';
     if (aiState?.error) return 'bg-destructive/20 text-destructive';
-    if (aiState?.isAISpeaking) return 'bg-primary/20 text-primary animate-pulse';
-    if (aiState?.isListening) return 'bg-call-active/20 text-call-active';
-    return 'bg-call-active/20 text-call-active';
+    
+    switch (aiState?.conversationState) {
+      case 'user_speaking':
+        return 'bg-blue-500/20 text-blue-500';
+      case 'processing':
+        return 'bg-yellow-500/20 text-yellow-500 animate-pulse';
+      case 'ai_speaking':
+        return 'bg-primary/20 text-primary animate-pulse';
+      case 'idle':
+        return 'bg-call-active/20 text-call-active';
+      default:
+        return 'bg-call-active/20 text-call-active';
+    }
   };
 
   return (
@@ -92,12 +129,14 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
         </div>
 
         {/* Audio level visualization */}
-        {aiState?.isAISpeaking && (
+        {(aiState?.isAISpeaking || aiState?.isUserSpeaking) && (
           <div className="mb-6 flex items-center justify-center gap-1">
             {[...Array(10)].map((_, i) => (
               <div
                 key={i}
-                className={`w-1 bg-primary rounded-full transition-all duration-100 ${
+                className={`w-1 rounded-full transition-all duration-100 ${
+                  aiState?.isAISpeaking ? 'bg-primary' : 'bg-blue-500'
+                } ${
                   audioLevel > i * 10 ? 'h-8' : 'h-2'
                 }`}
               />
@@ -140,6 +179,19 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
             )}
           </Button>
 
+          {/* Manual turn complete button */}
+          {onManualTurnComplete && aiState?.conversationState === 'user_speaking' && (
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={onManualTurnComplete}
+              className="h-12 w-12 rounded-full bg-blue-500/20 hover:bg-blue-500/30"
+              title="Stop speaking and let AI respond"
+            >
+              <Square className="h-5 w-5" />
+            </Button>
+          )}
+
           {/* Speaker indicator */}
           <Button
             variant="ghost"
@@ -168,9 +220,16 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
         {/* Status text */}
         <div className="text-center mt-6">
           <p className="text-sm text-muted-foreground">
-            {aiState?.isListening ? 'Speak naturally - your emergency contact is listening' : 
-             aiState?.isAISpeaking ? 'Your emergency contact is speaking' :
-             'Tap to end call'}
+            {aiState?.conversationState === 'user_speaking' 
+              ? 'Speaking... Tap square to finish your turn'
+              : aiState?.conversationState === 'processing'
+              ? 'Processing your message...'
+              : aiState?.conversationState === 'ai_speaking'
+              ? 'Your emergency contact is speaking'
+              : aiState?.isListening
+              ? 'Speak naturally - AI will detect when you finish'
+              : 'Tap to end call'
+            }
           </p>
         </div>
       </Card>

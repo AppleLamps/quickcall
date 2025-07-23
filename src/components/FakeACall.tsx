@@ -52,7 +52,7 @@ const FakeACall = () => {
           setCallState('ai-conversation');
           toast({
             title: "AI Assistant Connected",
-            description: "Your emergency contact is now on the line. Speak naturally!",
+            description: "Your emergency contact is now on the line. The AI will automatically detect when you finish speaking.",
           });
         }, 1000);
         
@@ -94,8 +94,12 @@ const FakeACall = () => {
         aiState={callState === 'ai-conversation' ? {
           isAISpeaking: geminiLive.isAISpeaking,
           isListening: geminiLive.isListening,
-          error: geminiLive.error
+          isUserSpeaking: geminiLive.isUserSpeaking,
+          error: geminiLive.error,
+          conversationState: geminiLive.conversationState
         } : undefined}
+        onManualTurnComplete={geminiLive.manualTurnComplete}
+        getVolumeLevel={geminiLive.getVolumeLevel}
       />
     );
   }
@@ -123,7 +127,7 @@ const FakeACall = () => {
           FakeACall
         </h1>
         <p className="text-muted-foreground text-lg max-w-md">
-          Your discreet escape button with AI conversation. Tap to receive an "important" call and gracefully exit any situation.
+          Your discreet escape button with AI conversation. The AI will automatically detect when you finish speaking and respond naturally.
         </p>
       </div>
 
@@ -158,7 +162,7 @@ const FakeACall = () => {
       {/* Footer */}
       <div className="fixed bottom-6 left-0 right-0 text-center">
         <p className="text-xs text-muted-foreground">
-          AI-Powered • Discreet • Believable • Your Freedom
+          AI-Powered • Voice Activity Detection • Believable • Your Freedom
         </p>
       </div>
     </div>

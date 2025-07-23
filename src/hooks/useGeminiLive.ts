@@ -8,7 +8,9 @@ interface GeminiLiveState {
   isConnected: boolean;
   isAISpeaking: boolean;
   isListening: boolean;
+  isUserSpeaking: boolean;
   error: string | null;
+  conversationState: 'idle' | 'user_speaking' | 'processing' | 'ai_speaking';
 }
 
 export const useGeminiLive = () => {
@@ -16,12 +18,15 @@ export const useGeminiLive = () => {
     isConnected: false,
     isAISpeaking: false,
     isListening: false,
-    error: null
+    isUserSpeaking: false,
+    error: null,
+    conversationState: 'idle'
   });
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioRecorderRef = useRef<AudioRecorder | null>(null);
   const audioQueueRef = useRef<AudioQueue | null>(null);
+  const turnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Initialize with 24kHz for output
@@ -30,6 +35,35 @@ export const useGeminiLive = () => {
     return () => {
       disconnect();
     };
+  }, []);
+
+  const handleSpeechStart = useCallback(() => {
+    console.log('User started speaking');
+    setState(prev => ({ 
+      ...prev, 
+      isUserSpeaking: true,
+      conversationState: 'user_speaking'
+    }));
+    
+    // Clear any existing timeout
+    if (turnTimeoutRef.current) {
+      clearTimeout(turnTimeoutRef.current);
+      turnTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleSpeechEnd = useCallback(() => {
+    console.log('User stopped speaking - sending turn complete');
+    setState(prev => ({ 
+      ...prev, 
+      isUserSpeaking: false,
+      conversationState: 'processing'
+    }));
+    
+    // Send turn complete after a brief delay to ensure all audio was sent
+    turnTimeoutRef.current = setTimeout(() => {
+      sendTurnComplete();
+    }, 500);
   }, []);
 
   const connect = useCallback(async () => {
@@ -57,6 +91,7 @@ export const useGeminiLive = () => {
           // Handle setup completion
           if (data.setupComplete) {
             console.log('Gemini setup completed, ready for conversation');
+            setState(prev => ({ ...prev, conversationState: 'idle' }));
             return;
           }
           
@@ -68,7 +103,11 @@ export const useGeminiLive = () => {
               modelTurn.parts.forEach((part: any) => {
                 if (part.inlineData?.mimeType === 'audio/pcm' && part.inlineData?.data) {
                   console.log('Received audio data from Gemini');
-                  setState(prev => ({ ...prev, isAISpeaking: true }));
+                  setState(prev => ({ 
+                    ...prev, 
+                    isAISpeaking: true,
+                    conversationState: 'ai_speaking'
+                  }));
                   
                   // Decode and play audio (24kHz output)
                   const audioData = AudioEncoder.decodeFromGemini(part.inlineData.data);
@@ -78,8 +117,12 @@ export const useGeminiLive = () => {
             }
             
             if (turnComplete) {
-              console.log('AI turn complete');
-              setState(prev => ({ ...prev, isAISpeaking: false }));
+              console.log('AI turn complete - ready for user input');
+              setState(prev => ({ 
+                ...prev, 
+                isAISpeaking: false,
+                conversationState: 'idle'
+              }));
             }
           }
           
@@ -96,6 +139,8 @@ export const useGeminiLive = () => {
           isConnected: false, 
           isAISpeaking: false,
           isListening: false,
+          isUserSpeaking: false,
+          conversationState: 'idle',
           error: event.code === 1008 ? 'API key not configured' : null
         }));
       };
@@ -105,7 +150,8 @@ export const useGeminiLive = () => {
         setState(prev => ({ 
           ...prev, 
           error: 'Connection failed',
-          isConnected: false 
+          isConnected: false,
+          conversationState: 'idle'
         }));
       };
 
@@ -113,36 +159,41 @@ export const useGeminiLive = () => {
       console.error('Failed to connect:', error);
       setState(prev => ({ 
         ...prev, 
-        error: 'Failed to connect to AI service' 
+        error: 'Failed to connect to AI service',
+        conversationState: 'idle'
       }));
     }
   }, []);
 
   const startAudioRecording = useCallback(async () => {
     try {
-      audioRecorderRef.current = new AudioRecorder((audioData) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const encodedAudio = AudioEncoder.encodeForGemini(audioData);
-          
-          // Use correct message format for Gemini Live API
-          const message = {
-            clientContent: {
-              turns: [{
-                role: "user",
-                parts: [{
-                  inlineData: {
-                    mimeType: "audio/pcm",
-                    data: encodedAudio
-                  }
-                }]
-              }],
-              turnComplete: false
-            }
-          };
-          
-          wsRef.current.send(JSON.stringify(message));
-        }
-      });
+      audioRecorderRef.current = new AudioRecorder(
+        (audioData) => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            const encodedAudio = AudioEncoder.encodeForGemini(audioData);
+            
+            // Use correct message format for Gemini Live API
+            const message = {
+              clientContent: {
+                turns: [{
+                  role: "user",
+                  parts: [{
+                    inlineData: {
+                      mimeType: "audio/pcm",
+                      data: encodedAudio
+                    }
+                  }]
+                }],
+                turnComplete: false
+              }
+            };
+            
+            wsRef.current.send(JSON.stringify(message));
+          }
+        },
+        handleSpeechStart,
+        handleSpeechEnd
+      );
 
       await audioRecorderRef.current.start();
       setState(prev => ({ ...prev, isListening: true }));
@@ -150,12 +201,18 @@ export const useGeminiLive = () => {
       console.error('Failed to start audio recording:', error);
       setState(prev => ({ 
         ...prev, 
-        error: 'Failed to access microphone' 
+        error: 'Failed to access microphone',
+        conversationState: 'idle'
       }));
     }
-  }, []);
+  }, [handleSpeechStart, handleSpeechEnd]);
 
   const disconnect = useCallback(() => {
+    if (turnTimeoutRef.current) {
+      clearTimeout(turnTimeoutRef.current);
+      turnTimeoutRef.current = null;
+    }
+
     if (audioRecorderRef.current) {
       audioRecorderRef.current.stop();
       audioRecorderRef.current = null;
@@ -174,12 +231,15 @@ export const useGeminiLive = () => {
       isConnected: false,
       isAISpeaking: false,
       isListening: false,
-      error: null
+      isUserSpeaking: false,
+      error: null,
+      conversationState: 'idle'
     });
   }, []);
 
   const sendTurnComplete = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('Sending turn complete signal');
       const message = {
         clientContent: {
           turnComplete: true
@@ -189,10 +249,21 @@ export const useGeminiLive = () => {
     }
   }, []);
 
+  const manualTurnComplete = useCallback(() => {
+    console.log('Manual turn complete triggered');
+    handleSpeechEnd();
+  }, [handleSpeechEnd]);
+
+  const getVolumeLevel = useCallback(() => {
+    return audioRecorderRef.current?.getVolumeLevel() || 0;
+  }, []);
+
   return {
     ...state,
     connect,
     disconnect,
-    sendTurnComplete
+    sendTurnComplete,
+    manualTurnComplete,
+    getVolumeLevel
   };
 };

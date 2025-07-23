@@ -1,8 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import CallButton from './CallButton';
 import CallInterface from './CallInterface';
+import iOSHomeScreen from './iOSHomeScreen';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { useGeminiLive } from '@/hooks/useGeminiLive';
 import { useToast } from '@/components/ui/use-toast';
@@ -51,8 +51,8 @@ const FakeACall = () => {
         setTimeout(() => {
           setCallState('ai-conversation');
           toast({
-            title: "AI Assistant Connected",
-            description: "Your emergency contact is now on the line. The AI will automatically detect when you finish speaking.",
+            title: "Emergency Contact Connected",
+            description: "Your emergency contact is now on the line.",
           });
         }, 1000);
         
@@ -81,10 +81,11 @@ const FakeACall = () => {
 
     toast({
       title: "Call Ended",
-      description: "Your escape route is complete!",
+      description: "Call completed successfully.",
     });
   };
 
+  // Show call interface when connected or in AI conversation
   if (callState === 'connected' || callState === 'ai-conversation') {
     return (
       <CallInterface
@@ -104,69 +105,47 @@ const FakeACall = () => {
     );
   }
 
+  // Show end call screen
   if (callState === 'ended') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6">
-        <Card className="w-full max-w-sm p-8 bg-gradient-surface shadow-surface border-border/50 text-center">
-          <div className="text-call-ended text-2xl font-semibold mb-4">
-            Call Ended
-          </div>
-          <p className="text-muted-foreground">
-            Mission accomplished! Returning to standby...
-          </p>
-        </Card>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center font-sf-pro">
+        <div className="text-center">
+          <div className="text-2xl font-light mb-4">Call Ended</div>
+          <p className="text-gray-400">Returning to home screen...</p>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-background">
-      {/* Header */}
-      <div className="text-center mb-12 animate-fade-in-up">
-        <h1 className="text-4xl font-bold text-foreground mb-4">
-          FakeACall
-        </h1>
-        <p className="text-muted-foreground text-lg max-w-md">
-          Your discreet escape button with AI conversation. The AI will automatically detect when you finish speaking and respond naturally.
-        </p>
-      </div>
-
-      {/* Main call button */}
-      <div className="mb-12">
-        <CallButton
-          onInitiateCall={initiateCall}
-          isRinging={callState === 'ringing'}
-          disabled={callState !== 'idle'}
-        />
-      </div>
-
-      {/* Status */}
-      <div className="text-center">
-        {callState === 'idle' && (
-          <p className="text-muted-foreground">
-            Tap the button to initiate your AI-powered escape call
-          </p>
-        )}
-        {callState === 'ringing' && (
-          <div className="animate-pulse">
-            <p className="text-primary font-semibold text-lg mb-2">
-              Incoming Call...
-            </p>
-            <p className="text-muted-foreground text-sm">
-              Get ready to "answer" your AI emergency contact
-            </p>
+  // Show ringing state
+  if (callState === 'ringing') {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col font-sf-pro">
+        <div className="flex-1 flex flex-col items-center justify-center px-8">
+          <div className="text-center mb-8">
+            <div className="w-32 h-32 bg-gray-600 rounded-full mb-6 flex items-center justify-center animate-pulse">
+              <div className="w-16 h-16 bg-gray-400 rounded-full" />
+            </div>
+            
+            <h1 className="text-3xl font-light mb-2">Emergency Contact</h1>
+            <p className="text-gray-400 text-lg">Calling...</p>
           </div>
-        )}
+        </div>
+        
+        <div className="pb-12 flex justify-center">
+          <button
+            onClick={endCall}
+            className="h-16 w-16 rounded-full bg-red-600 hover:bg-red-700 shadow-lg flex items-center justify-center"
+          >
+            <div className="w-6 h-6 bg-white rounded-sm" />
+          </button>
+        </div>
       </div>
+    );
+  }
 
-      {/* Footer */}
-      <div className="fixed bottom-6 left-0 right-0 text-center">
-        <p className="text-xs text-muted-foreground">
-          AI-Powered • Voice Activity Detection • Believable • Your Freedom
-        </p>
-      </div>
-    </div>
-  );
+  // Show home screen
+  return <iOSHomeScreen onAppPress={initiateCall} />;
 };
 
 export default FakeACall;

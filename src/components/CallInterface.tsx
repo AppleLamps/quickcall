@@ -1,8 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { PhoneOff, Mic, MicOff, Volume2, VolumeX, Square } from 'lucide-react';
+import { PhoneOff, Mic, MicOff, Volume2, VolumeX, MessageSquare, UserPlus, Pause, Video } from 'lucide-react';
+import iOSStatusBar from './iOSStatusBar';
 
 interface AIState {
   isAISpeaking: boolean;
@@ -47,12 +47,10 @@ const CallInterface = ({
     let interval: NodeJS.Timeout;
     
     if (aiState?.isAISpeaking) {
-      // AI speaking - show animated bars
       interval = setInterval(() => {
         setAudioLevel(Math.random() * 100);
       }, 100);
     } else if (aiState?.isUserSpeaking && getVolumeLevel) {
-      // User speaking - show real volume level
       interval = setInterval(() => {
         setAudioLevel(getVolumeLevel() * 100);
       }, 100);
@@ -65,174 +63,165 @@ const CallInterface = ({
     };
   }, [aiState?.isAISpeaking, aiState?.isUserSpeaking, getVolumeLevel]);
 
-  const getConnectionStatus = () => {
+  const getStatusText = () => {
     if (!isConnected) return 'Connecting...';
-    if (aiState?.error) {
-      if (aiState.error.includes('API key')) return 'API Key Missing';
-      if (aiState.error.includes('Connection failed')) return 'Connection Failed';
-      return 'Connection Error';
-    }
+    if (aiState?.error) return 'Connection Error';
     
     switch (aiState?.conversationState) {
       case 'user_speaking':
-        return 'You are speaking...';
+        return 'Speaking...';
       case 'processing':
         return 'Processing...';
       case 'ai_speaking':
-        return 'Emergency Contact Speaking';
-      case 'idle':
-        return aiState?.isListening ? 'Listening - Speak now' : 'Ready';
+        return 'AI Speaking';
       default:
         return 'Connected';
     }
   };
 
-  const getStatusColor = () => {
-    if (!isConnected) return 'bg-muted text-muted-foreground';
-    if (aiState?.error) return 'bg-destructive/20 text-destructive';
-    
-    switch (aiState?.conversationState) {
-      case 'user_speaking':
-        return 'bg-blue-500/20 text-blue-500';
-      case 'processing':
-        return 'bg-yellow-500/20 text-yellow-500 animate-pulse';
-      case 'ai_speaking':
-        return 'bg-primary/20 text-primary animate-pulse';
-      case 'idle':
-        return 'bg-call-active/20 text-call-active';
-      default:
-        return 'bg-call-active/20 text-call-active';
-    }
-  };
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 animate-fade-in-up">
-      <Card className="w-full max-w-sm p-8 bg-gradient-surface shadow-surface border-border/50">
-        {/* Connection status */}
-        <div className="text-center mb-8">
-          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${getStatusColor()}`}>
-            <div className={`w-2 h-2 rounded-full ${
-              isConnected && !aiState?.error ? 'bg-call-active animate-pulse' : 'bg-muted-foreground'
-            }`} />
-            {getConnectionStatus()}
-          </div>
-        </div>
+    <div className="min-h-screen bg-black text-white flex flex-col font-sf-pro">
+      {/* Status Bar */}
+      <iOSStatusBar />
 
-        {/* Caller info */}
+      {/* Call Header */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8 py-12">
+        
+        {/* Contact Info */}
         <div className="text-center mb-8">
-          <h2 className="text-xl font-semibold text-foreground mb-2">
-            Emergency Contact
-          </h2>
-          <p className="text-muted-foreground">
-            {aiState ? 'AI Assistant Ready' : 'Connecting...'}
+          <div className="w-32 h-32 bg-gray-600 rounded-full mb-6 flex items-center justify-center">
+            <div className="w-16 h-16 bg-gray-400 rounded-full" />
+          </div>
+          
+          <h1 className="text-3xl font-light mb-2">Emergency Contact</h1>
+          <p className="text-green-400 text-lg font-medium mb-2">
+            {getStatusText()}
+          </p>
+          <p className="text-gray-400 text-lg">
+            {formatTime(callDuration)}
           </p>
         </div>
 
-        {/* Audio level visualization */}
+        {/* Audio Visualization */}
         {(aiState?.isAISpeaking || aiState?.isUserSpeaking) && (
-          <div className="mb-6 flex items-center justify-center gap-1">
-            {[...Array(10)].map((_, i) => (
+          <div className="mb-8 flex items-center justify-center gap-1">
+            {[...Array(20)].map((_, i) => (
               <div
                 key={i}
                 className={`w-1 rounded-full transition-all duration-100 ${
-                  aiState?.isAISpeaking ? 'bg-primary' : 'bg-blue-500'
+                  aiState?.isAISpeaking ? 'bg-green-400' : 'bg-blue-400'
                 } ${
-                  audioLevel > i * 10 ? 'h-8' : 'h-2'
+                  audioLevel > i * 5 ? 'h-8' : 'h-2'
                 }`}
               />
             ))}
           </div>
         )}
 
-        {/* Call timer */}
-        <div className="text-center mb-8">
-          <div className="text-3xl font-mono font-bold text-foreground">
-            {formatTime(callDuration)}
-          </div>
-        </div>
-
-        {/* Error message */}
+        {/* Error Message */}
         {aiState?.error && (
-          <div className="text-center mb-4 p-3 bg-destructive/20 text-destructive rounded-md text-sm">
-            {aiState.error}
-            {aiState.error.includes('API key') && (
-              <div className="mt-2 text-xs">
-                Please configure your Gemini API key in the project settings
-              </div>
-            )}
+          <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-8 text-center">
+            <p className="text-red-400 text-sm">{aiState.error}</p>
           </div>
         )}
 
-        {/* Call controls */}
-        <div className="flex items-center justify-center gap-6">
-          {/* Mute button */}
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={toggleMute}
-            className="h-12 w-12 rounded-full"
-          >
-            {isMuted ? (
-              <MicOff className="h-5 w-5" />
-            ) : (
-              <Mic className="h-5 w-5" />
-            )}
-          </Button>
-
-          {/* Manual turn complete button */}
-          {onManualTurnComplete && aiState?.conversationState === 'user_speaking' && (
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={onManualTurnComplete}
-              className="h-12 w-12 rounded-full bg-blue-500/20 hover:bg-blue-500/30"
-              title="Stop speaking and let AI respond"
-            >
-              <Square className="h-5 w-5" />
-            </Button>
-          )}
-
-          {/* Speaker indicator */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-12 w-12 rounded-full"
-            disabled
-          >
-            {aiState?.isAISpeaking ? (
-              <Volume2 className="h-5 w-5 text-primary" />
-            ) : (
-              <VolumeX className="h-5 w-5 text-muted-foreground" />
-            )}
-          </Button>
-
-          {/* End call button */}
-          <Button
-            variant="call-end"
-            size="call"
-            onClick={onEndCall}
-            className="h-16 w-16"
-          >
-            <PhoneOff className="h-6 w-6" />
-          </Button>
-        </div>
-
-        {/* Status text */}
-        <div className="text-center mt-6">
-          <p className="text-sm text-muted-foreground">
+        {/* Status Message */}
+        <div className="text-center mb-12">
+          <p className="text-gray-300 text-sm">
             {aiState?.conversationState === 'user_speaking' 
-              ? 'Speaking... Tap square to finish your turn'
+              ? 'Speak naturally - AI will detect when you finish'
               : aiState?.conversationState === 'processing'
               ? 'Processing your message...'
               : aiState?.conversationState === 'ai_speaking'
-              ? 'Your emergency contact is speaking'
-              : aiState?.isListening
-              ? 'Speak naturally - AI will detect when you finish'
-              : 'Tap to end call'
+              ? 'Emergency contact is responding'
+              : 'Ready to listen'
             }
           </p>
         </div>
-      </Card>
+      </div>
+
+      {/* Call Controls */}
+      <div className="px-8 pb-12">
+        {/* First row of controls */}
+        <div className="flex justify-center gap-16 mb-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-16 w-16 rounded-full bg-gray-800 hover:bg-gray-700"
+            disabled
+          >
+            <MessageSquare className="h-6 w-6 text-white" />
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-16 w-16 rounded-full bg-gray-800 hover:bg-gray-700"
+            disabled
+          >
+            <Video className="h-6 w-6 text-white" />
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-16 w-16 rounded-full bg-gray-800 hover:bg-gray-700"
+            disabled
+          >
+            <UserPlus className="h-6 w-6 text-white" />
+          </Button>
+        </div>
+
+        {/* Second row of controls */}
+        <div className="flex justify-center gap-16 mb-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleMute}
+            className={`h-16 w-16 rounded-full ${
+              isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-800 hover:bg-gray-700'
+            }`}
+          >
+            {isMuted ? (
+              <MicOff className="h-6 w-6 text-white" />
+            ) : (
+              <Mic className="h-6 w-6 text-white" />
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-16 w-16 rounded-full bg-gray-800 hover:bg-gray-700"
+            disabled
+          >
+            {aiState?.isAISpeaking ? (
+              <Volume2 className="h-6 w-6 text-white" />
+            ) : (
+              <VolumeX className="h-6 w-6 text-gray-400" />
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-16 w-16 rounded-full bg-gray-800 hover:bg-gray-700"
+            disabled
+          >
+            <Pause className="h-6 w-6 text-white" />
+          </Button>
+        </div>
+
+        {/* End Call Button */}
+        <div className="flex justify-center">
+          <Button
+            onClick={onEndCall}
+            className="h-16 w-16 rounded-full bg-red-600 hover:bg-red-700 shadow-lg"
+          >
+            <PhoneOff className="h-6 w-6 text-white" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };

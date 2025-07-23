@@ -1,23 +1,26 @@
+
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import CallButton from './CallButton';
 import CallInterface from './CallInterface';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
+import { useGeminiLive } from '@/hooks/useGeminiLive';
 import { useToast } from '@/components/ui/use-toast';
 
-type CallState = 'idle' | 'ringing' | 'connected' | 'ended';
+type CallState = 'idle' | 'ringing' | 'connected' | 'ai-conversation' | 'ended';
 
 const FakeACall = () => {
   const [callState, setCallState] = useState<CallState>('idle');
   const [callDuration, setCallDuration] = useState(0);
   const { playRingtone, stopRingtone } = useAudioPlayer();
+  const geminiLive = useGeminiLive();
   const { toast } = useToast();
 
   // Call timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (callState === 'connected') {
+    if (callState === 'connected' || callState === 'ai-conversation') {
       interval = setInterval(() => {
         setCallDuration(prev => prev + 1);
       }, 1000);
@@ -35,16 +38,24 @@ const FakeACall = () => {
       // Play ringtone
       await playRingtone();
       
-      // Ring for 2-3 rings (about 4-6 seconds)
-      setTimeout(() => {
+      // Ring for 2-3 rings then connect to AI
+      setTimeout(async () => {
         stopRingtone();
         setCallState('connected');
         setCallDuration(0);
         
-        toast({
-          title: "Call Connected",
-          description: "You're now connected to your emergency contact.",
-        });
+        // Connect to Gemini Live API
+        await geminiLive.connect();
+        
+        // Transition to AI conversation after brief moment
+        setTimeout(() => {
+          setCallState('ai-conversation');
+          toast({
+            title: "AI Assistant Connected",
+            description: "Your emergency contact is now on the line. Speak naturally!",
+          });
+        }, 1000);
+        
       }, 5000);
       
     } catch (error) {
@@ -60,6 +71,7 @@ const FakeACall = () => {
 
   const endCall = () => {
     stopRingtone();
+    geminiLive.disconnect();
     setCallState('ended');
     
     setTimeout(() => {
@@ -73,12 +85,17 @@ const FakeACall = () => {
     });
   };
 
-  if (callState === 'connected') {
+  if (callState === 'connected' || callState === 'ai-conversation') {
     return (
       <CallInterface
         onEndCall={endCall}
         callDuration={callDuration}
-        isConnected={true}
+        isConnected={callState === 'ai-conversation'}
+        aiState={callState === 'ai-conversation' ? {
+          isAISpeaking: geminiLive.isAISpeaking,
+          isListening: geminiLive.isListening,
+          error: geminiLive.error
+        } : undefined}
       />
     );
   }
@@ -106,7 +123,7 @@ const FakeACall = () => {
           FakeACall
         </h1>
         <p className="text-muted-foreground text-lg max-w-md">
-          Your discreet escape button. Tap to receive an "important" call and gracefully exit any situation.
+          Your discreet escape button with AI conversation. Tap to receive an "important" call and gracefully exit any situation.
         </p>
       </div>
 
@@ -123,7 +140,7 @@ const FakeACall = () => {
       <div className="text-center">
         {callState === 'idle' && (
           <p className="text-muted-foreground">
-            Tap the button to initiate your escape call
+            Tap the button to initiate your AI-powered escape call
           </p>
         )}
         {callState === 'ringing' && (
@@ -132,7 +149,7 @@ const FakeACall = () => {
               Incoming Call...
             </p>
             <p className="text-muted-foreground text-sm">
-              Get ready to "answer" your important call
+              Get ready to "answer" your AI emergency contact
             </p>
           </div>
         )}
@@ -141,7 +158,7 @@ const FakeACall = () => {
       {/* Footer */}
       <div className="fixed bottom-6 left-0 right-0 text-center">
         <p className="text-xs text-muted-foreground">
-          Discreet • Believable • Your Freedom
+          AI-Powered • Discreet • Believable • Your Freedom
         </p>
       </div>
     </div>

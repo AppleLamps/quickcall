@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,101 +24,87 @@ serve(async (req) => {
       return response;
     }
 
-    let geminiSocket: WebSocket | null = null;
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp",
+      systemInstruction: "You are an AI assistant helping someone escape from an awkward situation by pretending to be their emergency contact. Keep the conversation natural and believable. Ask about their location, if they need help, and create a realistic scenario that would require them to leave immediately. Speak in a concerned, caring tone as if you're a close friend or family member.",
+    });
+
+    let liveSession: any = null;
     
-    socket.onopen = () => {
+    socket.onopen = async () => {
       console.log("Client connected to relay");
       
-      // Connect to Gemini Live API with correct endpoint
-      const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
-      geminiSocket = new WebSocket(geminiUrl);
-      
-      geminiSocket.onopen = () => {
-        console.log("Connected to Gemini Live API");
-        
-        // Send setup message with correct model and 24kHz output
-        const setupMessage = {
-          setup: {
-            model: "models/gemini-2.5-flash-preview-native-audio-dialog",
-            generation_config: {
-              response_modalities: ["AUDIO"],
-              speech_config: {
-                voice_config: {
-                  prebuilt_voice_config: {
-                    voice_name: "Aoede"
-                  }
+      try {
+        // Create live session with proper configuration
+        liveSession = await model.createLiveSession({
+          config: {
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: "Aoede"
                 }
               }
             },
-            tools: [],
-            system_instruction: {
-              parts: [
-                {
-                  text: "You are an AI assistant helping someone escape from an awkward situation by pretending to be their emergency contact. Keep the conversation natural and believable. Ask about their location, if they need help, and create a realistic scenario that would require them to leave immediately. Speak in a concerned, caring tone as if you're a close friend or family member."
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: "Aoede"
+                  }
                 }
-              ]
+              }
             }
           }
-        };
-        
-        geminiSocket.send(JSON.stringify(setupMessage));
-      };
+        });
 
-      geminiSocket.onmessage = (event) => {
-        console.log("Message from Gemini:", event.data);
-        try {
-          const data = JSON.parse(event.data);
+        console.log("Live session created successfully");
+        
+        // Handle incoming messages from Gemini
+        for await (const response of liveSession.receiveAll()) {
+          console.log("Received from Gemini:", response);
           
           // Forward all messages to client
-          socket.send(event.data);
-          
-          // Log setup completion
-          if (data.setupComplete) {
-            console.log("Gemini setup completed successfully");
-          }
-          
-        } catch (error) {
-          console.error("Error parsing Gemini message:", error);
+          socket.send(JSON.stringify(response));
         }
-      };
-
-      geminiSocket.onclose = (event) => {
-        console.log("Gemini connection closed:", event.code, event.reason);
-        socket.close(event.code, event.reason);
-      };
-
-      geminiSocket.onerror = (error) => {
-        console.error("Gemini WebSocket error:", error);
-        socket.close(1008, "Gemini API connection error");
-      };
+        
+      } catch (error) {
+        console.error("Error creating live session:", error);
+        socket.close(1008, "Failed to create live session");
+      }
     };
 
-    socket.onmessage = (event) => {
+    socket.onmessage = async (event) => {
       console.log("Message from client:", event.data);
+      
+      if (!liveSession) {
+        console.error("Live session not initialized");
+        return;
+      }
+
       try {
         const data = JSON.parse(event.data);
         
-        if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
-          geminiSocket.send(event.data);
-        } else {
-          console.error("Gemini socket not ready, state:", geminiSocket?.readyState);
-        }
+        // Forward client messages to Gemini Live session
+        await liveSession.send(data);
+        
       } catch (error) {
-        console.error("Error parsing client message:", error);
+        console.error("Error parsing/sending client message:", error);
       }
     };
 
     socket.onclose = (event) => {
       console.log("Client disconnected:", event.code, event.reason);
-      if (geminiSocket) {
-        geminiSocket.close();
+      if (liveSession) {
+        liveSession.close();
       }
     };
 
     socket.onerror = (error) => {
       console.error("Client WebSocket error:", error);
-      if (geminiSocket) {
-        geminiSocket.close();
+      if (liveSession) {
+        liveSession.close();
       }
     };
 

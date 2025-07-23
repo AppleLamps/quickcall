@@ -88,14 +88,7 @@ export const useGeminiLive = () => {
           const data = JSON.parse(event.data);
           console.log('Received from Gemini:', data);
           
-          // Handle setup completion
-          if (data.setupComplete) {
-            console.log('Gemini setup completed, ready for conversation');
-            setState(prev => ({ ...prev, conversationState: 'idle' }));
-            return;
-          }
-          
-          // Handle server content with audio
+          // Handle different response types from Gemini Live SDK
           if (data.serverContent) {
             const { modelTurn, turnComplete } = data.serverContent;
             
@@ -124,6 +117,12 @@ export const useGeminiLive = () => {
                 conversationState: 'idle'
               }));
             }
+          }
+          
+          // Handle other response types
+          if (data.type === 'setupComplete') {
+            console.log('Gemini setup completed, ready for conversation');
+            setState(prev => ({ ...prev, conversationState: 'idle' }));
           }
           
         } catch (error) {
@@ -172,7 +171,7 @@ export const useGeminiLive = () => {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             const encodedAudio = AudioEncoder.encodeForGemini(audioData);
             
-            // Use correct realtimeInput format for Gemini Live API
+            // Use realtimeInput format for Gemini Live API
             const message = {
               realtimeInput: {
                 mediaChunks: [{

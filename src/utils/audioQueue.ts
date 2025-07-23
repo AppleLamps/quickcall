@@ -4,9 +4,11 @@ export class AudioQueue {
   private isPlaying = false;
   private audioContext: AudioContext | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
+  private sampleRate: number;
 
-  constructor() {
-    this.audioContext = new AudioContext({ sampleRate: 16000 });
+  constructor(sampleRate: number = 24000) {
+    this.sampleRate = sampleRate;
+    this.audioContext = new AudioContext({ sampleRate });
   }
 
   async addToQueue(audioData: Uint8Array) {
@@ -51,7 +53,7 @@ export class AudioQueue {
       };
       
       this.currentSource.start(0);
-      console.log('Playing audio chunk');
+      console.log(`Playing audio chunk at ${this.sampleRate}Hz`);
     } catch (error) {
       console.error('Error playing audio:', error);
       this.playNext(); // Continue with next chunk even if current fails
@@ -59,11 +61,10 @@ export class AudioQueue {
   }
 
   private createWavFromPCM(pcmData: Uint8Array): Uint8Array {
-    const sampleRate = 16000;
     const numChannels = 1;
     const bitsPerSample = 16;
     const blockAlign = (numChannels * bitsPerSample) / 8;
-    const byteRate = sampleRate * blockAlign;
+    const byteRate = this.sampleRate * blockAlign;
     const dataSize = pcmData.length;
     const fileSize = 44 + dataSize;
 
@@ -84,7 +85,7 @@ export class AudioQueue {
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
     view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
+    view.setUint32(24, this.sampleRate, true);
     view.setUint32(28, byteRate, true);
     view.setUint16(32, blockAlign, true);
     view.setUint16(34, bitsPerSample, true);

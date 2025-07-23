@@ -3,7 +3,6 @@ import { useRef, useCallback, useState, useEffect } from 'react';
 import { AudioRecorder } from '@/utils/audioRecorder';
 import { AudioEncoder } from '@/utils/audioEncoder';
 import { AudioQueue } from '@/utils/audioQueue';
-import { supabase } from '@/integrations/supabase/client';
 
 interface GeminiLiveState {
   isConnected: boolean;
@@ -25,7 +24,8 @@ export const useGeminiLive = () => {
   const audioQueueRef = useRef<AudioQueue | null>(null);
 
   useEffect(() => {
-    audioQueueRef.current = new AudioQueue();
+    // Initialize with 24kHz for output
+    audioQueueRef.current = new AudioQueue(24000);
     
     return () => {
       disconnect();
@@ -36,10 +36,11 @@ export const useGeminiLive = () => {
     try {
       setState(prev => ({ ...prev, error: null }));
       
-      // Get the project ID from the supabase client
+      // Use correct WebSocket URL with /functions/v1/ prefix
       const projectId = 'keuxuonslkcvdeysdoge';
-      const wsUrl = `wss://${projectId}.functions.supabase.co/gemini-live`;
+      const wsUrl = `wss://${projectId}.functions.supabase.co/functions/v1/gemini-live`;
       
+      console.log('Connecting to:', wsUrl);
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
@@ -53,24 +54,38 @@ export const useGeminiLive = () => {
           const data = JSON.parse(event.data);
           console.log('Received from Gemini:', data);
           
-          if (data.serverContent?.modelTurn?.parts) {
-            const parts = data.serverContent.modelTurn.parts;
-            parts.forEach((part: any) => {
-              if (part.inlineData?.mimeType === 'audio/pcm') {
-                setState(prev => ({ ...prev, isAISpeaking: true }));
-                
-                // Decode and play audio
-                const audioData = AudioEncoder.decodeFromGemini(part.inlineData.data);
-                audioQueueRef.current?.addToQueue(audioData);
-              }
-            });
+          // Handle setup completion
+          if (data.setupComplete) {
+            console.log('Gemini setup completed, ready for conversation');
+            return;
           }
           
-          if (data.serverContent?.turnComplete) {
-            setState(prev => ({ ...prev, isAISpeaking: false }));
+          // Handle server content with audio
+          if (data.serverContent) {
+            const { modelTurn, turnComplete } = data.serverContent;
+            
+            if (modelTurn?.parts) {
+              modelTurn.parts.forEach((part: any) => {
+                if (part.inlineData?.mimeType === 'audio/pcm' && part.inlineData?.data) {
+                  console.log('Received audio data from Gemini');
+                  setState(prev => ({ ...prev, isAISpeaking: true }));
+                  
+                  // Decode and play audio (24kHz output)
+                  const audioData = AudioEncoder.decodeFromGemini(part.inlineData.data);
+                  audioQueueRef.current?.addToQueue(audioData);
+                }
+              });
+            }
+            
+            if (turnComplete) {
+              console.log('AI turn complete');
+              setState(prev => ({ ...prev, isAISpeaking: false }));
+            }
           }
+          
         } catch (error) {
           console.error('Error parsing Gemini response:', error);
+          setState(prev => ({ ...prev, error: 'Failed to parse response' }));
         }
       };
 
@@ -80,7 +95,8 @@ export const useGeminiLive = () => {
           ...prev, 
           isConnected: false, 
           isAISpeaking: false,
-          isListening: false 
+          isListening: false,
+          error: event.code === 1008 ? 'API key not configured' : null
         }));
       };
 
@@ -108,6 +124,7 @@ export const useGeminiLive = () => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           const encodedAudio = AudioEncoder.encodeForGemini(audioData);
           
+          // Use correct message format for Gemini Live API
           const message = {
             clientContent: {
               turns: [{

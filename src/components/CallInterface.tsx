@@ -50,10 +50,14 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
 
   const getConnectionStatus = () => {
     if (!isConnected) return 'Connecting...';
-    if (aiState?.error) return 'Connection Error';
-    if (aiState?.isAISpeaking) return 'AI Speaking';
-    if (aiState?.isListening) return 'Listening';
-    return 'Connected';
+    if (aiState?.error) {
+      if (aiState.error.includes('API key')) return 'API Key Missing';
+      if (aiState.error.includes('Connection failed')) return 'Connection Failed';
+      return 'Connection Error';
+    }
+    if (aiState?.isAISpeaking) return 'Emergency Contact Speaking';
+    if (aiState?.isListening) return 'Listening...';
+    return 'Connected - Speak now';
   };
 
   const getStatusColor = () => {
@@ -83,7 +87,7 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
             Emergency Contact
           </h2>
           <p className="text-muted-foreground">
-            {aiState ? 'AI Assistant' : 'Incoming call...'}
+            {aiState ? 'AI Assistant Ready' : 'Connecting...'}
           </p>
         </div>
 
@@ -110,8 +114,13 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
 
         {/* Error message */}
         {aiState?.error && (
-          <div className="text-center mb-4 p-2 bg-destructive/20 text-destructive rounded-md text-sm">
+          <div className="text-center mb-4 p-3 bg-destructive/20 text-destructive rounded-md text-sm">
             {aiState.error}
+            {aiState.error.includes('API key') && (
+              <div className="mt-2 text-xs">
+                Please configure your Gemini API key in the project settings
+              </div>
+            )}
           </div>
         )}
 
@@ -159,7 +168,9 @@ const CallInterface = ({ onEndCall, callDuration, isConnected, aiState }: CallIn
         {/* Status text */}
         <div className="text-center mt-6">
           <p className="text-sm text-muted-foreground">
-            {aiState?.isListening ? 'Speak naturally - AI is listening' : 'Tap to end call'}
+            {aiState?.isListening ? 'Speak naturally - your emergency contact is listening' : 
+             aiState?.isAISpeaking ? 'Your emergency contact is speaking' :
+             'Tap to end call'}
           </p>
         </div>
       </Card>

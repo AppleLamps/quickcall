@@ -28,17 +28,17 @@ serve(async (req) => {
     socket.onopen = () => {
       console.log("Client connected to relay");
       
-      // Connect to Gemini Live API
+      // Connect to Gemini Live API with correct endpoint
       const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
       geminiSocket = new WebSocket(geminiUrl);
       
       geminiSocket.onopen = () => {
         console.log("Connected to Gemini Live API");
         
-        // Send setup message to Gemini
+        // Send setup message with correct model and 24kHz output
         const setupMessage = {
           setup: {
-            model: "models/gemini-2.0-flash-exp",
+            model: "models/gemini-2.5-flash-preview-native-audio-dialog",
             generation_config: {
               response_modalities: ["AUDIO"],
               speech_config: {
@@ -49,10 +49,11 @@ serve(async (req) => {
                 }
               }
             },
+            tools: [],
             system_instruction: {
               parts: [
                 {
-                  text: "You are an AI assistant helping someone escape from an awkward situation by pretending to be their emergency contact. Keep the conversation natural and believable. Ask about their location, if they need help, and create a realistic scenario that would require them to leave immediately."
+                  text: "You are an AI assistant helping someone escape from an awkward situation by pretending to be their emergency contact. Keep the conversation natural and believable. Ask about their location, if they need help, and create a realistic scenario that would require them to leave immediately. Speak in a concerned, caring tone as if you're a close friend or family member."
                 }
               ]
             }
@@ -64,7 +65,20 @@ serve(async (req) => {
 
       geminiSocket.onmessage = (event) => {
         console.log("Message from Gemini:", event.data);
-        socket.send(event.data);
+        try {
+          const data = JSON.parse(event.data);
+          
+          // Forward all messages to client
+          socket.send(event.data);
+          
+          // Log setup completion
+          if (data.setupComplete) {
+            console.log("Gemini setup completed successfully");
+          }
+          
+        } catch (error) {
+          console.error("Error parsing Gemini message:", error);
+        }
       };
 
       geminiSocket.onclose = (event) => {
@@ -80,8 +94,16 @@ serve(async (req) => {
 
     socket.onmessage = (event) => {
       console.log("Message from client:", event.data);
-      if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
-        geminiSocket.send(event.data);
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
+          geminiSocket.send(event.data);
+        } else {
+          console.error("Gemini socket not ready, state:", geminiSocket?.readyState);
+        }
+      } catch (error) {
+        console.error("Error parsing client message:", error);
       }
     };
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import CallInterface from './CallInterface';
@@ -144,7 +143,7 @@ const FakeACall = () => {
     );
   }
 
-  // Show home screen
+  // Show home screen without dock
   return <IOSHomeScreen onAppPress={initiateCall} />;
 };
 

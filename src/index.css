@@ -2,41 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* FakeACall Design System - Professional communication theme */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Core backgrounds - Deep professional blues */
+    --background: 220 25% 8%;
+    --foreground: 210 40% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Card and surface colors */
+    --card: 220 20% 12%;
+    --card-foreground: 210 40% 95%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 220 20% 12%;
+    --popover-foreground: 210 40% 95%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary - Professional call blue */
+    --primary: 200 95% 45%;
+    --primary-foreground: 220 25% 8%;
+    --primary-glow: 200 95% 55%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Muted communication tones */
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 210 30% 85%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted tones */
+    --muted: 220 15% 18%;
+    --muted-foreground: 215 15% 65%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Success green for active calls */
+    --accent: 145 80% 45%;
+    --accent-foreground: 220 25% 8%;
 
-    --destructive: 0 84.2% 60.2%;
+    /* Call states */
+    --call-active: 145 80% 45%;
+    --call-incoming: 200 95% 45%;
+    --call-ended: 0 75% 55%;
+
+    --destructive: 0 75% 55%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 15% 25%;
+    --input: 220 15% 20%;
+    --ring: 200 95% 45%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Custom gradients for call interface */
+    --gradient-call: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-surface: linear-gradient(180deg, hsl(var(--card)), hsl(220 20% 10%));
+    --gradient-active: linear-gradient(135deg, hsl(var(--call-active)), hsl(145 80% 55%));
+
+    /* Shadows and glows */
+    --shadow-call: 0 20px 40px -15px hsl(var(--primary) / 0.4);
+    --shadow-glow: 0 0 60px hsl(var(--primary-glow) / 0.3);
+    --shadow-surface: 0 10px 30px -10px hsl(220 25% 5% / 0.5);
+
+    /* Animations */
+    --transition-call: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Call button sizing */
+    --call-button-size: 120px;
+    --call-button-size-mobile: 100px;
 
     --sidebar-background: 0 0% 98%;
 
@@ -101,5 +129,18 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    background: radial-gradient(circle at 50% 20%, hsl(var(--primary) / 0.1), transparent 50%),
+                linear-gradient(180deg, hsl(var(--background)), hsl(220 25% 6%));
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+  
+  .animation-delay-600 {
+    animation-delay: 600ms;
   }
 }

@@ -172,22 +172,17 @@ export const useGeminiLive = () => {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             const encodedAudio = AudioEncoder.encodeForGemini(audioData);
             
-            // Use correct message format for Gemini Live API
+            // Use correct realtimeInput format for Gemini Live API
             const message = {
-              clientContent: {
-                turns: [{
-                  role: "user",
-                  parts: [{
-                    inlineData: {
-                      mimeType: "audio/pcm",
-                      data: encodedAudio
-                    }
-                  }]
-                }],
-                turnComplete: false
+              realtimeInput: {
+                mediaChunks: [{
+                  mimeType: "audio/pcm;rate=16000",
+                  data: encodedAudio
+                }]
               }
             };
             
+            console.log('Sending audio chunk to Gemini Live');
             wsRef.current.send(JSON.stringify(message));
           }
         },
@@ -239,10 +234,10 @@ export const useGeminiLive = () => {
 
   const sendTurnComplete = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('Sending turn complete signal');
+      console.log('Sending turn complete signal using realtimeInput');
       const message = {
-        clientContent: {
-          turnComplete: true
+        realtimeInput: {
+          mediaChunks: []
         }
       };
       wsRef.current.send(JSON.stringify(message));

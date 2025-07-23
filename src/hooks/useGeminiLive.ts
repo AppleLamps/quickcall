@@ -71,7 +71,7 @@ export const useGeminiLive = () => {
       setState(prev => ({ ...prev, error: null }));
       
       const projectId = 'keuxuonslkcvdeysdoge';
-      const wsUrl = `wss://${projectId}.functions.supabase.co/functions/v1/gemini-live`;
+      const wsUrl = `wss://${projectId}.supabase.co/functions/v1/gemini-live`;
       
       console.log('Connecting to:', wsUrl);
       wsRef.current = new WebSocket(wsUrl);

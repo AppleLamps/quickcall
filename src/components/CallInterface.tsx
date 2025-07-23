@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PhoneOff, Mic, MicOff, Volume2, VolumeX, MessageSquare, UserPlus, Pause, Video } from 'lucide-react';
-import iOSStatusBar from './iOSStatusBar';
+import IOSStatusBar from './iOSStatusBar';
 
 interface AIState {
   isAISpeaking: boolean;
@@ -82,7 +82,7 @@ const CallInterface = ({
   return (
     <div className="min-h-screen bg-black text-white flex flex-col font-sf-pro">
       {/* Status Bar */}
-      <iOSStatusBar />
+      <IOSStatusBar />
 
       {/* Call Header */}
       <div className="flex-1 flex flex-col items-center justify-center px-8 py-12">

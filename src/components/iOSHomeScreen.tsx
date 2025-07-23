@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import AppIcon from './AppIcon';
-import iOSStatusBar from './iOSStatusBar';
+import IOSStatusBar from './iOSStatusBar';
 
 interface iOSHomeScreenProps {
   onAppPress: () => void;
@@ -28,7 +28,7 @@ const iOSHomeScreen = ({ onAppPress }: iOSHomeScreenProps) => {
       <div className="absolute inset-0 bg-black/20" />
       
       {/* Status Bar */}
-      <iOSStatusBar />
+      <IOSStatusBar />
 
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center justify-center flex-1 px-8 py-12">

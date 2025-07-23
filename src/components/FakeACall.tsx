@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import CallInterface from './CallInterface';
-import iOSHomeScreen from './iOSHomeScreen';
+import IOSHomeScreen from './iOSHomeScreen';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { useGeminiLive } from '@/hooks/useGeminiLive';
 import { useToast } from '@/components/ui/use-toast';
@@ -145,7 +145,7 @@ const FakeACall = () => {
   }
 
   // Show home screen
-  return <iOSHomeScreen onAppPress={initiateCall} />;
+  return <IOSHomeScreen onAppPress={initiateCall} />;
 };
 
 export default FakeACall;

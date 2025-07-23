@@ -8,7 +8,17 @@ export class AudioQueue {
 
   constructor(sampleRate: number = 24000) {
     this.sampleRate = sampleRate;
-    this.audioContext = new AudioContext({ sampleRate });
+  }
+
+  private async initAudioContext() {
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
+    }
+    
+    // Resume audio context if suspended
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
   }
 
   async addToQueue(audioData: Uint8Array) {
@@ -31,13 +41,10 @@ export class AudioQueue {
     const audioData = this.queue.shift()!;
 
     try {
+      await this.initAudioContext();
+      
       if (!this.audioContext) {
         throw new Error('Audio context not initialized');
-      }
-
-      // Resume audio context if suspended
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
       }
 
       const wavData = this.createWavFromPCM(audioData);

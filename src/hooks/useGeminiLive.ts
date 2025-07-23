@@ -29,7 +29,7 @@ export const useGeminiLive = () => {
   const turnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Initialize with 24kHz for output
+    // Initialize with 24kHz for output (Gemini outputs at 24kHz)
     audioQueueRef.current = new AudioQueue(24000);
     
     return () => {
@@ -70,7 +70,6 @@ export const useGeminiLive = () => {
     try {
       setState(prev => ({ ...prev, error: null }));
       
-      // Use correct WebSocket URL with /functions/v1/ prefix
       const projectId = 'keuxuonslkcvdeysdoge';
       const wsUrl = `wss://${projectId}.functions.supabase.co/functions/v1/gemini-live`;
       
@@ -86,53 +85,52 @@ export const useGeminiLive = () => {
       wsRef.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('Received from Gemini:', data);
+          console.log('Received from edge function:', data);
           
-          // Handle different response types from Gemini Live SDK
-          if (data.serverContent) {
-            const { modelTurn, turnComplete } = data.serverContent;
-            
-            if (modelTurn?.parts) {
-              modelTurn.parts.forEach((part: any) => {
-                if (part.inlineData?.mimeType === 'audio/pcm' && part.inlineData?.data) {
-                  console.log('Received audio data from Gemini');
-                  setState(prev => ({ 
-                    ...prev, 
-                    isAISpeaking: true,
-                    conversationState: 'ai_speaking'
-                  }));
-                  
-                  // Decode and play audio (24kHz output)
-                  const audioData = AudioEncoder.decodeFromGemini(part.inlineData.data);
-                  audioQueueRef.current?.addToQueue(audioData);
-                }
-              });
-            }
-            
-            if (turnComplete) {
-              console.log('AI turn complete - ready for user input');
-              setState(prev => ({ 
-                ...prev, 
-                isAISpeaking: false,
-                conversationState: 'idle'
-              }));
-            }
-          }
-          
-          // Handle other response types
-          if (data.type === 'setupComplete') {
-            console.log('Gemini setup completed, ready for conversation');
+          if (data.type === 'setup_complete') {
+            console.log('Gemini Live setup completed');
             setState(prev => ({ ...prev, conversationState: 'idle' }));
           }
           
+          if (data.type === 'audio_response' && data.audioData) {
+            console.log('Received audio response from Gemini');
+            setState(prev => ({ 
+              ...prev, 
+              isAISpeaking: true,
+              conversationState: 'ai_speaking'
+            }));
+            
+            // Decode and play audio (24kHz output)
+            const audioData = AudioEncoder.decodeFromGemini(data.audioData);
+            audioQueueRef.current?.addToQueue(audioData);
+          }
+          
+          if (data.type === 'text_response' && data.text) {
+            console.log('Received text response from Gemini:', data.text);
+          }
+          
+          if (data.type === 'turn_complete') {
+            console.log('AI turn complete - ready for user input');
+            setState(prev => ({ 
+              ...prev, 
+              isAISpeaking: false,
+              conversationState: 'idle'
+            }));
+          }
+          
+          if (data.type === 'error') {
+            console.error('Error from Gemini:', data.error);
+            setState(prev => ({ ...prev, error: data.error }));
+          }
+          
         } catch (error) {
-          console.error('Error parsing Gemini response:', error);
+          console.error('Error parsing message from edge function:', error);
           setState(prev => ({ ...prev, error: 'Failed to parse response' }));
         }
       };
 
       wsRef.current.onclose = (event) => {
-        console.log('Gemini connection closed:', event.code, event.reason);
+        console.log('Connection closed:', event.code, event.reason);
         setState(prev => ({ 
           ...prev, 
           isConnected: false, 
@@ -171,17 +169,12 @@ export const useGeminiLive = () => {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             const encodedAudio = AudioEncoder.encodeForGemini(audioData);
             
-            // Use realtimeInput format for Gemini Live API
             const message = {
-              realtimeInput: {
-                mediaChunks: [{
-                  mimeType: "audio/pcm;rate=16000",
-                  data: encodedAudio
-                }]
-              }
+              type: 'audio_input',
+              audioData: encodedAudio
             };
             
-            console.log('Sending audio chunk to Gemini Live');
+            console.log('Sending audio chunk to edge function');
             wsRef.current.send(JSON.stringify(message));
           }
         },
@@ -233,11 +226,9 @@ export const useGeminiLive = () => {
 
   const sendTurnComplete = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('Sending turn complete signal using realtimeInput');
+      console.log('Sending turn complete signal to edge function');
       const message = {
-        realtimeInput: {
-          mediaChunks: []
-        }
+        type: 'turn_complete'
       };
       wsRef.current.send(JSON.stringify(message));
     }
